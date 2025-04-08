@@ -1,0 +1,350 @@
+[
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "idJeu",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "joueurA",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tentativesMax",
+				"type": "uint256"
+			}
+		],
+		"name": "JeuCree",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "idJeu",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "message",
+				"type": "string"
+			}
+		],
+		"name": "JeuTermine",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "idJeu",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "joueur",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "montant",
+				"type": "uint256"
+			}
+		],
+		"name": "MisePlace",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "idJeu",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "proposition",
+				"type": "uint256"
+			}
+		],
+		"name": "NombrePropose",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "idJeu",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "nombreSecret",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "sel",
+				"type": "uint256"
+			}
+		],
+		"name": "NombreRevele",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "idJeu",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "proposition",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "reponse",
+				"type": "string"
+			}
+		],
+		"name": "ReponseA",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "compteurJeux",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_nombreHashe",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_tentativesMax",
+				"type": "uint256"
+			}
+		],
+		"name": "creerJeu",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_idJeu",
+				"type": "uint256"
+			}
+		],
+		"name": "getEtat",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_idJeu",
+				"type": "uint256"
+			}
+		],
+		"name": "getTentativesRestantes",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "jeux",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "nombreHashe",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "address",
+				"name": "joueurA",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "joueurB",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tentativesMax",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tentativesRestantes",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "miseA",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "miseB",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum DevineNombreConfidentiel.Etat",
+				"name": "etat",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bool",
+				"name": "nombreRevele",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "nbPropositions",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_idJeu",
+				"type": "uint256"
+			}
+		],
+		"name": "participer",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_idJeu",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_proposition",
+				"type": "uint256"
+			}
+		],
+		"name": "proposer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_idJeu",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_indexProposition",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum DevineNombreConfidentiel.Reponse",
+				"name": "_reponse",
+				"type": "uint8"
+			}
+		],
+		"name": "repondre",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_idJeu",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_nombreSecret",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_sel",
+				"type": "uint256"
+			}
+		],
+		"name": "revelerNombre",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+]
