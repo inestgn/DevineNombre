@@ -48,10 +48,17 @@ class DevineNombreAvecMiseInterface:
             nonce = self.w3.eth.get_transaction_count(adresse_b)
             gas_price = self.w3.eth.gas_price
 
+            # Augmenter la limite de gas
+            gas_estimate = self.contract.functions.participer().estimate_gas({
+                "from": adresse_b,
+                "value": self.w3.to_wei(mise, "ether")
+            })
+            print(f"Gas estimé : {gas_estimate}")
+            
             tx = self.contract.functions.participer().build_transaction({
                 "from": adresse_b,
                 "nonce": nonce,
-                "gas": 300000,
+                "gas": gas_estimate * 2,  # Double du gas estimé pour plus de sécurité
                 "gasPrice": gas_price,
                 "value": self.w3.to_wei(mise, "ether")
             })
@@ -64,13 +71,29 @@ class DevineNombreAvecMiseInterface:
             receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
             if receipt["status"] == 1:
                 print(f"✅ Participation réussie. Transaction incluse dans le bloc {receipt['blockNumber']}.")
-                print(f"📜 Logs de la transaction : {receipt['logs']}")
+                # Vérification supplémentaire
+                joueur_b = self.contract.functions.joueurB().call()
+                print(f"Debug - Nouveau joueur B enregistré : {joueur_b}")
+                mise_b = self.contract.functions.miseB().call()
+                print(f"Debug - Nouvelle mise B enregistrée : {self.w3.from_wei(mise_b, 'ether')} ETH")
                 return True
             else:
                 print("❌ La transaction a échoué.")
-                print(f"📜 Receipt complet : {receipt}")
-                print(f"📜 Gas utilisé : {receipt['gasUsed']}")
-                print(f"📜 Logs Bloom : {receipt['logsBloom']}")
+                print(f"Debug - Receipt complet : {receipt}")
+                # Essayer de récupérer la raison de l'échec
+                try:
+                    reason = self.w3.eth.call({
+                        "from": adresse_b,
+                        "to": self.contract.address,
+                        "data": tx["data"],
+                        "value": tx["value"],
+                        "gas": tx["gas"],
+                        "gasPrice": tx["gasPrice"],
+                        "nonce": tx["nonce"]
+                    })
+                    print(f"Debug - Raison de l'échec : {reason}")
+                except Exception as call_error:
+                    print(f"Debug - Erreur lors de l'appel de test : {call_error}")
                 return False
         except Exception as e:
             print(f"Erreur lors de la participation : {e}")
@@ -91,7 +114,7 @@ class DevineNombreAvecMiseInterface:
             })
 
             signed_tx = self.w3.eth.account.sign_transaction(tx, private_key_a)
-            tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
             print(f"Transaction de réinitialisation envoyée avec hash : {tx_hash.hex()}")
 
             receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
@@ -104,6 +127,14 @@ class DevineNombreAvecMiseInterface:
 
     def deviner_nombre(self, adresse_b, private_key_b, proposition):
         try:
+            # Vérifier d'abord le nombre de tentatives restantes
+            tentatives_avant = self.contract.functions.getTentativesRestantes().call()
+            print(f"\n🎲 Il vous reste {tentatives_avant} tentative(s) avant cette proposition")
+            
+            if tentatives_avant == 0:
+                print("❌ Plus de tentatives disponibles. Le jeu est terminé.")
+                return True
+
             print(f"Envoi de la proposition : {proposition}")
             nonce = self.w3.eth.get_transaction_count(adresse_b)
             gas_price = self.w3.eth.gas_price
@@ -124,18 +155,33 @@ class DevineNombreAvecMiseInterface:
                 print(f"✅ Transaction incluse dans le bloc : {receipt['blockNumber']}")
                 try:
                     logs_devine = self.contract.events.NombreDevine().process_receipt(receipt)
+                    resultat = None
                     if logs_devine:
                         for log in logs_devine:
-                            print(f"📣 NombreDevine | Proposition : {log['args']['proposition']} - Résultat : {log['args']['resultat']}")
+                            resultat = log['args']['resultat']
+                            print(f"📣 NombreDevine | Proposition : {log['args']['proposition']} - Résultat : {resultat}")
+                            if resultat == "Correct !":
+                                print("\n🎉 FÉLICITATIONS ! Vous avez gagné ! Les mises vous sont transférées.")
+                                return True
 
-                    logs_termine = self.contract.events.JeuTermine().process_receipt(receipt)
-                    if logs_termine:
-                        for log in logs_termine:
-                            print(f"🎉 JeuTermine | Message : {log['args']['message']}")
+                    # Attendre un peu pour la synchronisation
+                    import time
+                    time.sleep(2)
+                    
+                    # Vérifier les tentatives après la proposition
+                    tentatives_apres = self.contract.functions.getTentativesRestantes().call()
+                    print(f"\n🎲 Il vous reste {tentatives_apres} tentative(s)")
+
+                    if tentatives_apres == 0:
+                        print("\n❌ PERDU ! Vous avez épuisé toutes vos tentatives.")
+                        print("💰 Les mises sont transférées au joueur A.")
                         return True
-                except Exception:
-                    pass
-                return False
+
+                    return False
+
+                except Exception as e:
+                    print(f"Erreur lors du traitement des événements : {e}")
+                    return False
             else:
                 print("❌ La transaction a échoué.")
                 return None
@@ -148,125 +194,136 @@ def main():
     abi_path = "Projet/abi_V2.json"
     private_key_a = os.getenv("PRIVATE_KEY_A")
     private_key_b = os.getenv("PRIVATE_KEY_B")
-    account_a = Web3(Web3.HTTPProvider("https://rpc.ankr.com/eth_sepolia/a2fc2d9e983406edd9fe27ba7ebe770465a1b489c2b245f13d0c11bf1db16d2f")).eth.account.from_key(private_key_a)
-    account_b = Web3(Web3.HTTPProvider("https://rpc.ankr.com/eth_sepolia/a2fc2d9e983406edd9fe27ba7ebe770465a1b489c2b245f13d0c11bf1db16d2f")).eth.account.from_key(private_key_b)
-
-    # Vérification explicite de la connexion au nœud Ankr
+    account_a = Web3(Web3.HTTPProvider(os.getenv("ANKR_URL"))).eth.account.from_key(private_key_a)
+    account_b = Web3(Web3.HTTPProvider(os.getenv("ANKR_URL"))).eth.account.from_key(private_key_b)
+    
     try:
+        # Vérification de la connexion
         print("Vérification de la connexion au nœud Ankr...")
         w3 = Web3(Web3.HTTPProvider(os.getenv("ANKR_URL")))
         if not w3.is_connected():
-            print("❌ Échec de la connexion au nœud Ankr. Vérifiez l'URL ou votre connexion Internet.")
+            print("❌ Échec de la connexion au nœud Ankr.")
             return
         print("✅ Connexion réussie au nœud Ankr.")
-        print(f"Version du client Ethereum : {w3.client_version}")
-        print(f"Numéro du dernier bloc : {w3.eth.block_number}")
-    except Exception as e:
-        print(f"❌ Erreur lors de la connexion au nœud Ankr : {e}")
-        return
-
-    jeu = DevineNombreAvecMiseInterface(contract_address, abi_path)
-
-    print("\n--- Infos Debug ---")
-    print(f"Adresse du joueur A : {account_a.address}")
-    print(f"Adresse du joueur B : {account_b.address}")
-    print(f"Adresse du contrat : {contract_address}")
-
-    # Vérifier l'état du jeu
-    etat = jeu.contract.functions.getEtat().call()
-    print(f"État du jeu : {etat}")
-    if etat == "En attente":
-        print("⚠️ Le jeu est en attente. Le joueur A doit redémarrer le jeu.")
-        return
-    elif etat != "En cours":
-        print("❌ Erreur : Le jeu n'est pas en cours.")
-        return
-
-    # Vérifier le propriétaire du contrat (joueur A)
-    joueur_a_contract = jeu.contract.functions.joueurA().call()
-    print(f"Adresse du joueur A dans le contrat : {joueur_a_contract}")
-    
-    if joueur_a_contract.lower() != account_a.address.lower():
-        print("❌ Erreur : L'adresse du joueur A ne correspond pas au propriétaire du contrat.")
-        return
-
-    # Vérifier l'état du jeu
-    etat = jeu.contract.functions.getEtat().call()
-    print(f"État du jeu : {etat}")
-    if etat != "En cours":
-        print("❌ Erreur : Le jeu n'est pas en cours.")
-        return
-
-    # Obtenir et vérifier la mise
-    try:
-        mise_a = jeu.contract.functions.miseA().call()
-        mise_minimale_eth = Web3.from_wei(mise_a, 'ether')
-        print(f"Mise du joueur A : {mise_minimale_eth} ETH")
         
-        # Définir une mise minimale absolue de 0.001 ETH pour couvrir les frais de gas
-        MISE_MINIMALE_ABSOLUE = 0.001  # 0.001 ETH minimum
-        
-        if float(mise_minimale_eth) < MISE_MINIMALE_ABSOLUE:
-            print(f"❌ La mise du joueur A ({mise_minimale_eth} ETH) est trop faible.")
-            print(f"La mise minimale requise est de {MISE_MINIMALE_ABSOLUE} ETH pour couvrir les frais de gas.")
-            print("Veuillez demander au joueur A de recréer une partie avec une mise plus élevée.")
-            return
-        
-        # Demander la mise au joueur B
-        while True:
-            try:
-                mise_b = float(input(f"Entrez votre mise en ETH (minimum {mise_minimale_eth} ETH) : "))
-                if mise_b < MISE_MINIMALE_ABSOLUE:
-                    print(f"❌ La mise doit être au moins de {MISE_MINIMALE_ABSOLUE} ETH pour couvrir les frais de gas")
-                    continue
-                if mise_b < float(mise_minimale_eth):
-                    print(f"❌ La mise doit être au moins égale à celle du joueur A ({mise_minimale_eth} ETH)")
-                    continue
-                break
-            except ValueError:
-                print("❌ Veuillez entrer un nombre valide")
+        jeu = DevineNombreAvecMiseInterface(contract_address, abi_path)
 
-        # Participation et jeu
-        print("\nParticipation du joueur B...")
-        if not jeu.participer(account_b.address, private_key_b, mise=mise_b):
-            print("❌ Échec de la participation. Arrêt du programme.")
+        # Vérifier si un joueur B existe déjà
+        try:
+            joueur_b_existant = jeu.contract.functions.joueurB().call()
+            if joueur_b_existant != "0x0000000000000000000000000000000000000000":
+                # Si le joueur B existe et qu'il s'agit de notre adresse, on peut continuer
+                if joueur_b_existant.lower() == account_b.address.lower():
+                    print("✅ Vous êtes déjà enregistré comme joueur B. Début du jeu...")
+                    # Passer directement à la phase de jeu
+                    print("\nDébut du jeu - Tentez de deviner le nombre!")
+                    while True:
+                        try:
+                            proposition = input("\nEntrez votre proposition (ou 'exit' pour quitter) : ")
+                            if proposition.lower() == "exit":
+                                break
+                            proposition = int(proposition)
+                            result = jeu.deviner_nombre(account_b.address, private_key_b, proposition)
+                            if result:
+                                print("Le jeu est terminé.")
+                                break
+                        except ValueError:
+                            print("❌ Veuillez entrer un nombre valide.")
+                        except Exception as e:
+                            print(f"❌ Erreur lors de la tentative : {e}")
+                            break
+                    return
+                else:
+                    print("❌ Un autre joueur B est déjà enregistré pour cette partie.")
+                    return
+        except Exception as e:
+            print(f"Erreur lors de la vérification du joueur B : {e}")
             return
 
-        print("\nVérification de l'état après participation...")
-        joueur_b_contract = jeu.contract.functions.joueurB().call()
-        mise_b_contract = jeu.contract.functions.miseB().call()
-        print(f"Adresse du joueur B dans le contrat : {joueur_b_contract}")
-        print(f"Mise du joueur B dans le contrat : {Web3.from_wei(mise_b_contract, 'ether')} ETH")
+        # Si on arrive ici, c'est qu'il n'y a pas encore de joueur B
+        # Continuer avec le code existant pour la participation...
+        print("\nRéinitialisation du jeu...")
+        try:
+            tx = jeu.contract.functions.reinitialiserJeu(
+                44,  # nombre secret
+                5   # tentatives max
+            ).build_transaction({
+                "from": account_a.address,
+                "nonce": w3.eth.get_transaction_count(account_a.address),
+                "gas": 300000,
+                "gasPrice": w3.eth.gas_price,
+                "value": w3.to_wei(0.001, "ether")
+            })
+            signed_tx = w3.eth.account.sign_transaction(tx, private_key_a)
+            tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+            w3.eth.wait_for_transaction_receipt(tx_hash)
+            print("✅ Jeu réinitialisé avec succès")
 
-        if joueur_b_contract.lower() != account_b.address.lower():
-            print("❌ Erreur : La participation du joueur B n'a pas été enregistrée correctement.")
-            return
+            # Continuer directement avec le reste du programme
+            print("\n--- Infos Debug ---")
+            print(f"Adresse du joueur A : {account_a.address}")
+            print(f"Adresse du joueur B : {account_b.address}")
+            print(f"Adresse du contrat : {contract_address}")
 
-        print("\nDébut du jeu - Tentez de deviner le nombre!")
-        while True:
-            # Afficher l'état actuel
+            # Vérifications de l'état du jeu
             etat = jeu.contract.functions.getEtat().call()
-            tentatives = jeu.contract.functions.getTentativesRestantes().call()
-            print(f"\nÉtat du jeu : {etat}")
-            print(f"Tentatives restantes : {tentatives}")
+            print(f"État du jeu : {etat}")
+            if etat != "En cours":
+                print("❌ Erreur : Le jeu n'est pas en cours.")
+                return
 
-            proposition = input("\nEntrez votre proposition (ou 'exit' pour quitter) : ")
-            if proposition.lower() == "exit":
-                print("Fin du jeu.")
-                break
-            try:
-                proposition = int(proposition)
-                result = jeu.deviner_nombre(account_b.address, private_key_b, proposition)
-                if result:
-                    print("Le jeu est terminé.")
+            # Vérifications du joueur A et de la mise
+            mise_a = jeu.contract.functions.miseA().call()
+            mise_minimale_eth = Web3.from_wei(mise_a, 'ether')
+            print(f"Mise du joueur A : {mise_minimale_eth} ETH")
+            
+            MISE_MINIMALE_ABSOLUE = 0.001
+            if float(mise_minimale_eth) < MISE_MINIMALE_ABSOLUE:
+                print(f"❌ La mise du joueur A ({mise_minimale_eth} ETH) est trop faible.")
+                print(f"La mise minimale requise est de {MISE_MINIMALE_ABSOLUE} ETH")
+                return
+
+            # Boucle de saisie de la mise du joueur B
+            while True:
+                try:
+                    mise_b = float(input(f"Entrez votre mise en ETH (minimum {mise_minimale_eth} ETH) : "))
+                    if mise_b >= float(mise_minimale_eth) and mise_b >= MISE_MINIMALE_ABSOLUE:
+                        break
+                    print(f"❌ La mise doit être au moins de {max(mise_minimale_eth, MISE_MINIMALE_ABSOLUE)} ETH")
+                except ValueError:
+                    print("❌ Veuillez entrer un nombre valide")
+
+            # Participation et jeu
+            if not jeu.participer(account_b.address, private_key_b, mise=mise_b):
+                print("❌ Échec de la participation. Arrêt du programme.")
+                return
+
+            # Boucle de jeu
+            print("\nDébut du jeu - Tentez de deviner le nombre!")
+            while True:
+                try:
+                    proposition = input("\nEntrez votre proposition (ou 'exit' pour quitter) : ")
+                    if proposition.lower() == "exit":
+                        break
+
+                    proposition = int(proposition)
+                    result = jeu.deviner_nombre(account_b.address, private_key_b, proposition)
+                    if result:
+                        print("Le jeu est terminé.")
+                        break
+
+                except ValueError:
+                    print("❌ Veuillez entrer un nombre valide.")
+                except Exception as e:
+                    print(f"❌ Erreur lors de la tentative : {e}")
                     break
-            except ValueError:
-                print("❌ Veuillez entrer un nombre valide.")
-            except Exception as e:
-                print(f"❌ Erreur lors de la tentative : {e}")
+
+        except Exception as e:
+            print(f"⚠️ Erreur lors de la réinitialisation : {e}")
+            return
 
     except Exception as e:
-        print(f"❌ Erreur initiale : {e}")
+        print(f"❌ Erreur principale : {e}")
 
 if __name__ == "__main__":
     main()

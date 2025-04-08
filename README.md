@@ -18,6 +18,7 @@ Ce projet implémente un jeu de devinettes de nombres sur la blockchain Ethereum
 - Réinitialisation automatique du jeu
 - Gestion des mises minimales
 - Le nombre a deviner est 44
+- La partie est réinitialisée à chaque fois qu'on lance le programme
 
 
 ### Version 3 : Contrat Générique
@@ -34,6 +35,7 @@ Dans l'option 2 du menu pour participer à un jeu, vous aurez la liste des id de
 - Vérification des réponses de A
 - Révélation du nombre à la fin
 - Protection contre la triche
+- Attention a bien écrire plus_petit / plus_grand / egal (ne pas oublier le _)
 
 ## Installation
 1. Cloner le repository
