@@ -127,22 +127,21 @@ class DevineNombreAvecMiseInterface:
 
     def deviner_nombre(self, adresse_b, private_key_b, proposition):
         try:
-            # Vérifier d'abord le nombre de tentatives restantes
-            tentatives_avant = self.contract.functions.getTentativesRestantes().call()
-            print(f"\n🎲 Il vous reste {tentatives_avant} tentative(s) avant cette proposition")
-            
-            if tentatives_avant == 0:
-                print("❌ Plus de tentatives disponibles. Le jeu est terminé.")
-                return True
-
             print(f"Envoi de la proposition : {proposition}")
             nonce = self.w3.eth.get_transaction_count(adresse_b)
             gas_price = self.w3.eth.gas_price
 
+            # Estimer le gas nécessaire
+            gas_estimate = self.contract.functions.deviner(proposition).estimate_gas({
+                "from": adresse_b
+            })
+            # Multiplier par 3 pour assurer assez de gas pour le transfert d'ETH
+            gas = gas_estimate * 3
+
             tx = self.contract.functions.deviner(proposition).build_transaction({
                 "from": adresse_b,
                 "nonce": nonce,
-                "gas": 300000,
+                "gas": max(gas, 800000),  # Au moins 800000 de gas pour le transfert
                 "gasPrice": gas_price
             })
 
@@ -154,31 +153,28 @@ class DevineNombreAvecMiseInterface:
             if receipt["status"] == 1:
                 print(f"✅ Transaction incluse dans le bloc : {receipt['blockNumber']}")
                 try:
+                    logs_termine = self.contract.events.JeuTermine().process_receipt(receipt)
+                    if logs_termine:
+                        for log in logs_termine:
+                            message = log['args']['message']
+                            print(f"\n🎮 {message}")
+                            return True  # Si on a un événement JeuTermine, c'est que le jeu est fini
+
                     logs_devine = self.contract.events.NombreDevine().process_receipt(receipt)
-                    resultat = None
                     if logs_devine:
                         for log in logs_devine:
                             resultat = log['args']['resultat']
                             print(f"📣 NombreDevine | Proposition : {log['args']['proposition']} - Résultat : {resultat}")
+                            
+                            # Ne pas retourner True tout de suite si c'est correct, le transfert doit se faire
                             if resultat == "Correct !":
                                 print("\n🎉 FÉLICITATIONS ! Vous avez gagné ! Les mises vous sont transférées.")
-                                return True
 
-                    # Attendre un peu pour la synchronisation
-                    import time
-                    time.sleep(2)
-                    
-                    # Vérifier les tentatives après la proposition
-                    tentatives_apres = self.contract.functions.getTentativesRestantes().call()
-                    print(f"\n🎲 Il vous reste {tentatives_apres} tentative(s)")
-
-                    if tentatives_apres == 0:
-                        print("\n❌ PERDU ! Vous avez épuisé toutes vos tentatives.")
-                        print("💰 Les mises sont transférées au joueur A.")
-                        return True
+                    # Vérifier les tentatives après tout
+                    tentatives = self.contract.functions.getTentativesRestantes().call()
+                    print(f"\n🎲 Il vous reste {tentatives} tentative(s)")
 
                     return False
-
                 except Exception as e:
                     print(f"Erreur lors du traitement des événements : {e}")
                     return False
