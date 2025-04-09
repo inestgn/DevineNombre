@@ -1,4 +1,4 @@
-# Jeu "Devine Nombre" sur Ethereum
+# Jeu Devine Nombre 
 
 Ce projet implémente un jeu de devinettes de nombres sur la blockchain Ethereum, avec plusieurs versions évolutives.
 
